@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/lib/auth/auth-context";
 import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
@@ -26,8 +27,10 @@ export default function RootLayout({
 					enableSystem
 					disableTransitionOnChange
 				>
-					<Toaster richColors position="top-center" />
-					{children}
+					<AuthProvider>
+						<Toaster richColors position="top-center" />
+						{children}
+					</AuthProvider>
 				</ThemeProvider>
 			</body>
 		</html>

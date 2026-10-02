@@ -4,6 +4,7 @@ import { embeddingService } from './embedding.service';
 export interface SearchOptions {
   limit?: number;
   documentId?: string;
+  userId?: string;
   minSimilarity?: number;
 }
 
@@ -25,7 +26,8 @@ export class VectorSearchService {
   private static readonly DEFAULT_LIMIT = 5;
 
   /**
-   * Performs semantic vector search over document_chunks using HNSW cosine index.
+   * Performs semantic vector search over document_chunks using HNSW cosine index,
+   * strictly scoped to the requesting user's documents if userId is supplied.
    */
   public async search(
     queryText: string,
@@ -33,12 +35,13 @@ export class VectorSearchService {
   ): Promise<SearchResultItem[]> {
     const limit = options.limit || VectorSearchService.DEFAULT_LIMIT;
     const documentIdFilter = options.documentId || null;
+    const userIdFilter = options.userId || null;
 
     // 1. Generate query embedding
     const queryEmbedding = await embeddingService.embedQuery(queryText);
     const vectorJson = `[${queryEmbedding.join(',')}]`;
 
-    // 2. Query document_chunks using HNSW halfvec cosine distance
+    // 2. Query document_chunks using HNSW halfvec cosine distance with user isolation
     const rawResults = await prisma.$queryRawUnsafe<
       Array<{
         chunkId: string;
@@ -67,11 +70,13 @@ export class VectorSearchService {
       FROM "document_chunks" c
       JOIN "documents" d ON c."documentId" = d."id"
       WHERE ($2::text IS NULL OR c."documentId" = $2)
+        AND ($4::text IS NULL OR d."userId" = $4)
       ORDER BY "distance" ASC
       LIMIT $3`,
       vectorJson,
       documentIdFilter,
-      limit
+      limit,
+      userIdFilter
     );
 
     // 3. Map into structured result with similarity score

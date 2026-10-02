@@ -24,6 +24,7 @@ enum MessageRole {
 model User {
   id            String         @id @default(uuid())
   email         String         @unique
+  passwordHash  String?
   name          String?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -90,6 +91,7 @@ model Message {
   conversationId String
   role           MessageRole
   content        String
+  citations      Json?        @default("[]")
   createdAt      DateTime     @default(now())
 
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

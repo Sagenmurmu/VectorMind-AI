@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { DocumentController, upload } from '../controllers/document.controller';
+import { optionalAuth } from '../middleware/auth.middleware';
 
 const router = Router();
+
+router.use(optionalAuth);
 
 // Upload document with optional ?sync=true
 router.post('/upload', upload.single('file'), DocumentController.uploadDocument);
@@ -16,3 +19,4 @@ router.get('/:id', DocumentController.getDocument);
 router.delete('/:id', DocumentController.deleteDocument);
 
 export default router;
+

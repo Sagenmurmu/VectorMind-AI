@@ -25,6 +25,7 @@ export class SearchController {
         limit: parsedLimit,
         documentId: documentId ? String(documentId) : undefined,
         minSimilarity: parsedMinSim,
+        userId: req.user?.id,
       });
 
       res.status(200).json({

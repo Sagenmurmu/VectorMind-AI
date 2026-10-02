@@ -1,20 +1,16 @@
-import { searchSimilarChunks } from '@/lib/actions/search';
 import { NextResponse } from 'next/server';
 
-export async function POST(req: Request) {
-  try {
-    const { query } = await req.json();
-    if (!query) {
-      return NextResponse.json({ error: 'Query is required' }, { status: 400 });
-    }
-
-    const results = await searchSimilarChunks(query);
-    return NextResponse.json({ results });
-  } catch (error) {
-    console.error('Search error:', error);
-    const message =
-      error instanceof Error ? error.message : 'Failed to search';
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+/**
+ * DEPRECATED in Phase 4:
+ * Legacy Next.js route superseded by the Express backend search endpoint at /api/v1/search.
+ */
+export async function POST() {
+  return NextResponse.json(
+    {
+      error: 'DEPRECATED_ENDPOINT',
+      message:
+        'This Next.js API route was deprecated in Phase 4. All semantic vector search queries are now served by the Express backend at /api/v1/search.',
+    },
+    { status: 410 }
+  );
 }
-

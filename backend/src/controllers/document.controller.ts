@@ -58,9 +58,11 @@ export class DocumentController {
       const chunkingMethod = (req.body.chunkingMethod as ChunkingMethod) || 'paragraph';
       const fixedSize = req.body.fixedSize ? parseInt(req.body.fixedSize, 10) : undefined;
       const isSync = req.query.sync === 'true' || req.body.sync === 'true' || req.body.sync === true;
+      const userId = req.user?.id;
 
       // 1. Create Document database record
       const document = await documentService.createDocument({
+        userId,
         title,
         fileName: file.originalname,
         fileSize: file.size,
@@ -149,11 +151,12 @@ export class DocumentController {
 
   /**
    * GET /api/v1/documents
-   * Lists all documents.
+   * Lists all documents. If authenticated, scopes to the authenticated user.
    */
-  public static async listDocuments(_req: Request, res: Response, next: NextFunction) {
+  public static async listDocuments(req: Request, res: Response, next: NextFunction) {
     try {
-      const documents = await documentService.listDocuments();
+      const userId = req.user?.id;
+      const documents = await documentService.listDocuments(userId);
       res.status(200).json({
         success: true,
         count: documents.length,
@@ -166,7 +169,7 @@ export class DocumentController {
 
   /**
    * GET /api/v1/documents/:id
-   * Retrieves single document details and chunk counts.
+   * Retrieves single document details and chunk counts with user authorization check.
    */
   public static async getDocument(req: Request, res: Response, next: NextFunction) {
     try {
@@ -177,6 +180,15 @@ export class DocumentController {
         res.status(404).json({
           success: false,
           error: `Document with ID '${id}' was not found.`,
+        });
+        return;
+      }
+
+      // If user is authenticated, ensure document belongs to user
+      if (req.user && document.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'Forbidden. You do not have permission to view this document.',
         });
         return;
       }
@@ -192,7 +204,7 @@ export class DocumentController {
 
   /**
    * DELETE /api/v1/documents/:id
-   * Deletes a document and cascades to its chunks.
+   * Deletes a document and cascades to its chunks with user authorization check.
    */
   public static async deleteDocument(req: Request, res: Response, next: NextFunction) {
     try {
@@ -203,6 +215,15 @@ export class DocumentController {
         res.status(404).json({
           success: false,
           error: `Document with ID '${id}' was not found.`,
+        });
+        return;
+      }
+
+      // If user is authenticated, ensure document belongs to user
+      if (req.user && existing.userId !== req.user.id) {
+        res.status(403).json({
+          success: false,
+          error: 'Forbidden. You do not have permission to delete this document.',
         });
         return;
       }

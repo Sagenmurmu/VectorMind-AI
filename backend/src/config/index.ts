@@ -23,4 +23,8 @@ export const config = {
     allowedMimeTypes: ['text/plain', 'application/pdf'],
     allowedExtensions: ['.txt', '.pdf'],
   },
+  auth: {
+    jwtSecret: process.env.JWT_SECRET || 'vectormind_dev_jwt_super_secret_key_2026_change_in_prod',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
 } as const;
