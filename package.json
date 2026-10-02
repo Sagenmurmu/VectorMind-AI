@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:backend": "pnpm -C backend dev",
     "build": "next build",
+    "build:backend": "pnpm -C backend build",
     "start": "next start",
+    "start:backend": "pnpm -C backend start",
     "lint": "next lint",
     "inngest": "pnpm dlx inngest-cli@latest dev --no-discovery -u http://localhost:3000/api/inngest"
   },

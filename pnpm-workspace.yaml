@@ -5,3 +5,4 @@ allowBuilds:
   prisma: false
   protobufjs: false
   sharp: false
+  esbuild: true

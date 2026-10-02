@@ -1,5 +1,5 @@
 # dependencies
-/node_modules
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -9,12 +9,13 @@
 !.yarn/versions
 
 # testing
-/coverage
+coverage/
 
-# next.js build output
-/.next/
-/out/
-/build
+# build output
+.next/
+out/
+build/
+dist/
 
 # debug logs
 npm-debug.log*
