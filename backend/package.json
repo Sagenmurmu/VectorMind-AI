@@ -10,18 +10,26 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
     "prisma:status": "prisma migrate status",
-    "test:db": "tsx src/scripts/verifyDbSanity.ts"
+    "test:db": "tsx src/scripts/verifyDbSanity.ts",
+    "test:phase3": "tsx src/scripts/verifyPhase3.ts"
   },
   "dependencies": {
+    "@ai-sdk/google": "0.0.55",
     "@prisma/client": "5.22.0",
+    "ai": "3.4.33",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "inngest": "3.54.2",
+    "multer": "1.4.5-lts.1",
+    "pdf-parse": "1.1.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/multer": "^2.3.0",
     "@types/node": "^20.17.10",
+    "@types/pdf-parse": "^1.1.5",
     "prisma": "5.22.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
