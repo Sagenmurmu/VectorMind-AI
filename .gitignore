@@ -1,0 +1,53 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js build output
+/.next/
+/out/
+/build
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# environment files (protect all secrets, allow only example template)
+.env
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# database & inngest local caches
+postgres_data
+.inngest/
+inngest.db*
+
+# operating system & editor files
+.DS_Store
+*.pem
+Thumbs.db
+.vscode/
+.idea/
