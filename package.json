@@ -10,6 +10,8 @@
     "start": "next start",
     "start:backend": "pnpm -C backend start",
     "lint": "next lint",
+    "prisma": "pnpm -C backend prisma",
+    "test:db": "pnpm -C backend test:db",
     "inngest": "pnpm dlx inngest-cli@latest dev --no-discovery -u http://localhost:3000/api/inngest"
   },
   "dependencies": {

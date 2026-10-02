@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  documents     Document[]
+  conversations Conversation[]
+
+  @@map("users")
+}
+
+model Document {
+  id         String          @id @default(uuid())
+  userId     String
+  title      String
+  fileName   String
+  fileSize   Int?
+  mimeType   String?
+  sourceType String          @default("file")
+  status     DocumentStatus  @default(PENDING)
+  metadata   Json?           @default("{}")
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks     DocumentChunk[]
+
+  @@index([userId])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id         String                 @id @default(uuid())
+  documentId String
+  chunkIndex Int
+  content    String
+  embedding  Unsupported("vector(3072)")?
+  metadata   Json?                  @default("{}")
+  pageNumber Int?
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  document   Document               @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([documentId, chunkIndex])
+  @@map("document_chunks")
+}
+
+model Conversation {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@index([userId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ==========================================
+// LEGACY MODELS (Preserved for compatibility)
+// ==========================================
+
+model items {
+  id        BigInt                 @id @default(autoincrement())
+  embedding Unsupported("vector")?
+}
+
+model oai {
+  id          BigInt                 @id @default(autoincrement())
+  chunk       String?
+  embedding   Unsupported("vector")?
+  createdAt   DateTime               @default(now())
+  metadata    Json?                  @default("{}")
+  updatedAt   DateTime               @default(now())
+  dummy_field String?
+}
