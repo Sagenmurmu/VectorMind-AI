@@ -51,10 +51,19 @@ async function request<T>(
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+    });
+  } catch (netErr: any) {
+    throw new ApiError(
+      `Cannot connect to Express backend at ${API_BASE_URL}. Please ensure the backend server is running (run 'pnpm dev:backend' in terminal).`,
+      0,
+      'NETWORK_ERROR'
+    );
+  }
 
   const contentType = response.headers.get('content-type');
   const isJson = contentType && contentType.includes('application/json');

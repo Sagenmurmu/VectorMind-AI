@@ -11,8 +11,10 @@ export function createApp(): Express {
   // Basic security and parsing middleware
   app.use(
     cors({
-      origin: [config.frontendUrl, 'http://localhost:3000'],
+      origin: [config.frontendUrl, 'http://localhost:3000', 'http://127.0.0.1:3000'],
       credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
     })
   );
   app.use(express.json());
