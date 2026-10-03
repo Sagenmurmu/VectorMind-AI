@@ -43,6 +43,8 @@ AI-generated responses are powered by **Google Gemini**, while retrieved documen
 * Automatic text extraction
 * Semantic paragraph-based chunking
 * Fixed-size chunking support
+* Asynchronous background ingestion pipeline via **Inngest**
+* Live polling and real-time document status tracking (`PENDING` -> `PROCESSING` -> `COMPLETED`)
 * Page number and chunk index tracking
 * Transactional document processing
 * Idempotent ingestion workflow
@@ -58,6 +60,7 @@ AI-generated responses are powered by **Google Gemini**, while retrieved documen
 
 ### 🤖 Retrieval-Augmented Generation
 
+* Real-time Server-Sent Events (SSE) token streaming
 * Grounded AI responses using retrieved document context
 * Google Gemini 2.5 Flash
 * Multi-document question answering
@@ -67,7 +70,7 @@ AI-generated responses are powered by **Google Gemini**, while retrieved documen
 
 ### 🔐 Authentication & Security
 
-* JWT-based authentication
+* **Auth.js / NextAuth** and JWT Bearer token authentication
 * Password hashing using `bcryptjs`
 * Protected API routes
 * Optional authentication for scoped resources

@@ -253,4 +253,95 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  chatStream: async (
+    body: {
+      query: string;
+      conversationId?: string;
+      documentId?: string;
+      topK?: number;
+      minSimilarity?: number;
+    },
+    callbacks: {
+      onMetadata?: (meta: {
+        conversationId: string;
+        sources: CitationItem[];
+        citations: CitationItem[];
+        model: string;
+        userMessageId?: string;
+      }) => void;
+      onChunk?: (text: string) => void;
+      onDone?: (data: { assistantMessageId?: string; fullAnswer: string }) => void;
+      onError?: (err: Error) => void;
+    }
+  ) => {
+    const token = getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...body, stream: true }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let msg = `Chat streaming request failed (${response.status})`;
+      try {
+        const json = JSON.parse(errorText);
+        msg = json.error?.message || json.message || msg;
+      } catch {}
+      throw new ApiError(msg, response.status);
+    }
+
+    if (!response.body) {
+      throw new Error('Response body is null, cannot stream.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith('data:')) continue;
+          const jsonStr = trimmed.slice(5).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'metadata') {
+              callbacks.onMetadata?.(event);
+            } else if (event.type === 'chunk') {
+              callbacks.onChunk?.(event.text);
+            } else if (event.type === 'done') {
+              callbacks.onDone?.(event);
+            } else if (event.type === 'error') {
+              callbacks.onError?.(new Error(event.error));
+            }
+          } catch (e) {
+            console.error('Failed to parse SSE line:', jsonStr, e);
+          }
+        }
+      }
+    } catch (err: any) {
+      callbacks.onError?.(err);
+      throw err;
+    }
+  },
 };

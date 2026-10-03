@@ -6,6 +6,7 @@ export const chatRequestSchema = z.object({
   documentId: z.string().uuid('Invalid document ID format.').optional(),
   topK: z.number().int().min(1).max(20).optional(),
   minSimilarity: z.number().min(0).max(1).optional(),
+  stream: z.boolean().optional(),
 });
 
 export type ChatRequestInput = z.infer<typeof chatRequestSchema>;

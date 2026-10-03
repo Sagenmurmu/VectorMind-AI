@@ -20,6 +20,7 @@ import {
 	Bot,
 	User,
 	Sparkles,
+	Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
@@ -31,6 +32,8 @@ export function ChatTab() {
 	const [messages, setMessages] = useState<MessageItem[]>([]);
 	const [inputQuery, setInputQuery] = useState("");
 	const [loadingChat, setLoadingChat] = useState(false);
+	const [isStreamingTokens, setIsStreamingTokens] = useState(false);
+	const [streamEnabled, setStreamEnabled] = useState(true);
 	const [loadingConvs, setLoadingConvs] = useState(false);
 	const [expandedCitations, setExpandedCitations] = useState<Record<string, boolean>>({});
 	const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -68,7 +71,7 @@ export function ChatTab() {
 
 	useEffect(() => {
 		scrollToBottom();
-	}, [messages, loadingChat]);
+	}, [messages, loadingChat, isStreamingTokens]);
 
 	// 2. Load messages for selected conversation
 	const selectConversation = async (convId: string) => {
@@ -125,7 +128,7 @@ export function ChatTab() {
 		}
 	};
 
-	// 5. Send message
+	// 5. Send message (supports SSE real-time token streaming with fallback)
 	const handleSendMessage = async (e: React.FormEvent) => {
 		e.preventDefault();
 		const trimmed = inputQuery.trim();
@@ -144,6 +147,105 @@ export function ChatTab() {
 		};
 		setMessages((prev) => [...prev, optimisticUserMsg]);
 
+		if (streamEnabled) {
+			const tempAsstId = `temp_asst_${Date.now()}`;
+			let currentAsstContent = "";
+			let currentCitations: CitationItem[] = [];
+
+			try {
+				await api.chatStream(
+					{
+						query: trimmed,
+						conversationId: activeConversationId || undefined,
+					},
+					{
+						onMetadata: (meta) => {
+							setLoadingChat(false);
+							setIsStreamingTokens(true);
+							currentCitations = meta.citations || meta.sources || [];
+							if (meta.conversationId && meta.conversationId !== activeConversationId) {
+								setActiveConversationId(meta.conversationId);
+								loadConversations();
+							}
+							setMessages((prev) => {
+								const exists = prev.some((m) => m.id === tempAsstId);
+								if (!exists) {
+									return [
+										...prev,
+										{
+											id: tempAsstId,
+											conversationId: meta.conversationId || "temp",
+											role: "ASSISTANT",
+											content: "",
+											citations: currentCitations,
+											createdAt: new Date().toISOString(),
+										},
+									];
+								}
+								return prev.map((m) =>
+									m.id === tempAsstId ? { ...m, citations: currentCitations } : m
+								);
+							});
+						},
+						onChunk: (chunk) => {
+							setLoadingChat(false);
+							setIsStreamingTokens(true);
+							currentAsstContent += chunk;
+							setMessages((prev) => {
+								const exists = prev.some((m) => m.id === tempAsstId);
+								if (!exists) {
+									return [
+										...prev,
+										{
+											id: tempAsstId,
+											conversationId: activeConversationId || "temp",
+											role: "ASSISTANT",
+											content: currentAsstContent,
+											citations: currentCitations,
+											createdAt: new Date().toISOString(),
+										},
+									];
+								}
+								return prev.map((m) =>
+									m.id === tempAsstId ? { ...m, content: currentAsstContent } : m
+								);
+							});
+						},
+						onDone: (done) => {
+							setIsStreamingTokens(false);
+							setLoadingChat(false);
+							if (done.assistantMessageId) {
+								setMessages((prev) =>
+									prev.map((m) =>
+										m.id === tempAsstId ? { ...m, id: done.assistantMessageId! } : m
+									)
+								);
+							}
+						},
+						onError: (err) => {
+							setIsStreamingTokens(false);
+							setLoadingChat(false);
+							console.error("Stream chunk error:", err);
+							toast.error(err.message || "Streaming interrupted.");
+						},
+					}
+				);
+			} catch (err: any) {
+				setIsStreamingTokens(false);
+				setLoadingChat(false);
+				console.error("Chat stream error:", err);
+				toast.error(err.message || "Failed to stream answer. Please try again.");
+				setMessages((prev) =>
+					prev.filter((m) => m.id !== optimisticUserMsg.id && m.id !== tempAsstId)
+				);
+			} finally {
+				setIsStreamingTokens(false);
+				setLoadingChat(false);
+			}
+			return;
+		}
+
+		// Non-streaming synchronous fallback
 		try {
 			const res = await api.chat({
 				query: trimmed,
@@ -169,10 +271,7 @@ export function ChatTab() {
 					createdAt: new Date().toISOString(),
 				};
 
-				setMessages((prev) => {
-					// Replace the optimistic message with server version if desired, or append
-					return [...prev, assistantMsg];
-				});
+				setMessages((prev) => [...prev, assistantMsg]);
 			}
 		} catch (err: any) {
 			console.error("Chat error:", err);
@@ -257,9 +356,24 @@ export function ChatTab() {
 						<Sparkles className="h-4 w-4 text-primary" />
 						<span className="font-semibold text-sm">VectorMind RAG Agent</span>
 					</div>
-					<Badge variant="outline" className="text-xs">
-						Model: Gemini 2.5 Flash
-					</Badge>
+					<div className="flex items-center gap-2">
+						<button
+							type="button"
+							onClick={() => setStreamEnabled(!streamEnabled)}
+							className={`text-[11px] px-2.5 py-0.5 rounded-full border flex items-center gap-1.5 transition-colors ${
+								streamEnabled
+									? "border-primary/50 bg-primary/10 text-primary font-medium"
+									: "border-border text-muted-foreground hover:bg-muted"
+							}`}
+							title="Toggle real-time token streaming"
+						>
+							<Zap className={`h-3 w-3 ${streamEnabled ? "fill-primary text-primary" : ""}`} />
+							<span>Stream: {streamEnabled ? "ON" : "OFF"}</span>
+						</button>
+						<Badge variant="outline" className="text-xs">
+							Gemini 2.5 Flash
+						</Badge>
+					</div>
 				</div>
 
 				<ScrollArea className="flex-1 p-4">

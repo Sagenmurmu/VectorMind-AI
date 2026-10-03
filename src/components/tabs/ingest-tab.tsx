@@ -19,6 +19,7 @@ export function IngestTab() {
 	const [rawText, setRawText] = useState("");
 	const [chunkingMethod, setChunkingMethod] = useState<"paragraph" | "fixed">("paragraph");
 	const [fixedSize, setFixedSize] = useState("500");
+	const [useAsyncInngest, setUseAsyncInngest] = useState(false);
 	const [loading, setLoading] = useState(false);
 
 	// Documents library state
@@ -43,6 +44,20 @@ export function IngestTab() {
 	useEffect(() => {
 		loadDocuments();
 	}, [isAuthenticated]);
+
+	// Auto-poll if any document is currently PENDING or PROCESSING in background
+	useEffect(() => {
+		const hasPending = documents.some(
+			(d) => d.status === "PENDING" || d.status === "PROCESSING"
+		);
+		if (!hasPending) return;
+
+		const timer = setInterval(() => {
+			loadDocuments();
+		}, 2500);
+
+		return () => clearInterval(timer);
+	}, [documents]);
 
 	const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		if (e.target.files && e.target.files[0]) {
@@ -89,12 +104,19 @@ export function IngestTab() {
 				formData.append("file", textFile);
 			}
 
-			const res = await api.documents.upload(formData, true);
+			const res = await api.documents.upload(formData, !useAsyncInngest);
 			if (res.success) {
-				toast.success(
-					`Ingested successfully! Created ${res.stats?.totalChunks ?? res.document._count?.chunks ?? "vector"} chunks.`,
-					{ id: toastId }
-				);
+				if (useAsyncInngest) {
+					toast.success(
+						"Document queued in Inngest background pipeline! Chunks are ingesting asynchronously...",
+						{ id: toastId }
+					);
+				} else {
+					toast.success(
+						`Ingested successfully! Created ${res.stats?.totalChunks ?? res.document._count?.chunks ?? "vector"} chunks.`,
+						{ id: toastId }
+					);
+				}
 				// Reset inputs
 				setSelectedFile(null);
 				setTitle("");
@@ -228,6 +250,31 @@ export function IngestTab() {
 										/>
 									</div>
 								)}
+							</div>
+
+							<div className="flex items-center justify-between p-3 rounded-lg border border-border/80 bg-muted/20">
+								<div className="space-y-0.5 pr-2">
+									<div className="text-xs font-semibold flex items-center gap-1.5">
+										<span>Async Inngest Ingestion</span>
+										<Badge variant="outline" className="text-[10px] px-1.5 py-0 border-primary/40 text-primary">
+											Inngest Pipeline
+										</Badge>
+									</div>
+									<p className="text-[11px] text-muted-foreground">
+										{useAsyncInngest
+											? "Dispatches job to Inngest background event queue (non-blocking with live status polling)"
+											: "Direct synchronous ingestion (completes embedding before returning response)"}
+									</p>
+								</div>
+								<label className="relative inline-flex items-center cursor-pointer">
+									<input
+										type="checkbox"
+										checked={useAsyncInngest}
+										onChange={(e) => setUseAsyncInngest(e.target.checked)}
+										className="sr-only peer"
+									/>
+									<div className="w-9 h-5 bg-muted-foreground/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+								</label>
 							</div>
 						</div>
 

@@ -1,5 +1,5 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText } from 'ai';
+import { generateText, streamText } from 'ai';
 import { config } from '../../config';
 import { prisma } from '../../db/prisma';
 import { vectorSearchService } from './vectorSearch.service';
@@ -37,6 +37,18 @@ export interface RagResponse {
   assistantMessageId?: string;
 }
 
+export interface RagStreamResult {
+  textStream: AsyncIterable<string>;
+  query: string;
+  sources: RagSourceItem[];
+  citations: RagSourceItem[];
+  contextCount: number;
+  model: string;
+  conversationId?: string;
+  userMessageId?: string;
+  finalize: (fullAnswer: string) => Promise<{ assistantMessageId?: string }>;
+}
+
 export class RagService {
   private google;
 
@@ -47,17 +59,15 @@ export class RagService {
   }
 
   /**
-   * Executes a complete RAG workflow:
-   * Multi-Turn History -> User Message Persistence -> User-Scoped Retrieval -> Context Construction -> LLM Completion -> Assistant Message Persistence.
+   * Prepares context, loads history, searches vector chunks, and builds prompts.
    */
-  public async answerQuestion(input: RagQueryInput): Promise<RagResponse> {
+  private async prepareRagContext(input: RagQueryInput) {
     const trimmedQuery = input.query.trim();
     if (!trimmedQuery) {
       throw new Error('Query string must not be empty.');
     }
 
     let userMessageId: string | undefined;
-    let assistantMessageId: string | undefined;
     let conversationHistoryText = '';
 
     // 1. If conversationId is supplied, verify ownership, load history, and persist user message
@@ -140,40 +150,71 @@ Guidelines:
     }
     userPrompt += `User Question: ${trimmedQuery}`;
 
-    // 6. Generate LLM Completion
+    const finalize = async (answer: string): Promise<{ assistantMessageId?: string }> => {
+      if (input.conversationId && input.userId) {
+        const assistantMsg = await prisma.message.create({
+          data: {
+            conversationId: input.conversationId,
+            role: 'ASSISTANT',
+            content: answer,
+            citations: sources as any,
+          },
+        });
+
+        // Update conversation timestamp and set title if it was default
+        const conv = await prisma.conversation.findUnique({ where: { id: input.conversationId } });
+        const newTitle =
+          conv?.title === 'New Chat'
+            ? trimmedQuery.slice(0, 40) + (trimmedQuery.length > 40 ? '...' : '')
+            : undefined;
+
+        await prisma.conversation.update({
+          where: { id: input.conversationId },
+          data: {
+            updatedAt: new Date(),
+            ...(newTitle ? { title: newTitle } : {}),
+          },
+        });
+
+        return { assistantMessageId: assistantMsg.id };
+      }
+      return {};
+    };
+
+    return {
+      trimmedQuery,
+      systemPrompt,
+      userPrompt,
+      sources,
+      retrievedChunks,
+      userMessageId,
+      finalize,
+    };
+  }
+
+  /**
+   * Executes a complete synchronous RAG workflow:
+   * Multi-Turn History -> User Message Persistence -> User-Scoped Retrieval -> Context Construction -> LLM Completion -> Assistant Message Persistence.
+   */
+  public async answerQuestion(input: RagQueryInput): Promise<RagResponse> {
+    const {
+      trimmedQuery,
+      systemPrompt,
+      userPrompt,
+      sources,
+      retrievedChunks,
+      userMessageId,
+      finalize,
+    } = await this.prepareRagContext(input);
+
+    // Generate LLM Completion
     const { text: answer } = await generateText({
       model: this.google(config.ai.chatModel),
       system: systemPrompt,
       prompt: userPrompt,
     });
 
-    // 7. Persist assistant message with citations if conversationId is present
-    if (input.conversationId && input.userId) {
-      const assistantMsg = await prisma.message.create({
-        data: {
-          conversationId: input.conversationId,
-          role: 'ASSISTANT',
-          content: answer,
-          citations: sources as any,
-        },
-      });
-      assistantMessageId = assistantMsg.id;
-
-      // Update conversation timestamp and set title if it was default
-      const conv = await prisma.conversation.findUnique({ where: { id: input.conversationId } });
-      const newTitle =
-        conv?.title === 'New Chat'
-          ? trimmedQuery.slice(0, 40) + (trimmedQuery.length > 40 ? '...' : '')
-          : undefined;
-
-      await prisma.conversation.update({
-        where: { id: input.conversationId },
-        data: {
-          updatedAt: new Date(),
-          ...(newTitle ? { title: newTitle } : {}),
-        },
-      });
-    }
+    const { assistantMessageId } = await finalize(answer);
 
     return {
       answer,
@@ -185,6 +226,39 @@ Guidelines:
       conversationId: input.conversationId,
       userMessageId,
       assistantMessageId,
+    };
+  }
+
+  /**
+   * Executes a streaming RAG workflow returning an AsyncIterable textStream along with metadata.
+   */
+  public async streamQuestion(input: RagQueryInput): Promise<RagStreamResult> {
+    const {
+      trimmedQuery,
+      systemPrompt,
+      userPrompt,
+      sources,
+      retrievedChunks,
+      userMessageId,
+      finalize,
+    } = await this.prepareRagContext(input);
+
+    const streamResult = await streamText({
+      model: this.google(config.ai.chatModel),
+      system: systemPrompt,
+      prompt: userPrompt,
+    });
+
+    return {
+      textStream: streamResult.textStream,
+      query: trimmedQuery,
+      sources,
+      citations: sources,
+      contextCount: retrievedChunks.length,
+      model: config.ai.chatModel,
+      conversationId: input.conversationId,
+      userMessageId,
+      finalize,
     };
   }
 }
